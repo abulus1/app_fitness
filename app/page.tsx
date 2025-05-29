@@ -19,10 +19,12 @@ export type UserProfile = {
 export type Exercise = {
   id: string
   name: string
-  videoUrl: string
+  category: string
+  youtubeUrl: string
   reps: number
   weight: number
   calories?: number
+  mets?: number // Added METS as it's in the DB and likely needed for calorie calculation
 }
 
 export type DayWorkout = {
