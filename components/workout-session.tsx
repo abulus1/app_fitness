@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge"
 import type { DayWorkout, Exercise, UserProfile } from "@/app/page"
 import { ArrowLeft, CheckCircle, Timer, Flame } from "lucide-react"
 
+import { WorkoutRecord } from "@/app/page"; // Import WorkoutRecord
+
 interface WorkoutSessionProps {
   workout: DayWorkout
   userProfile: UserProfile
-  onComplete: () => void
+  onComplete: (completedWorkoutData: WorkoutRecord) => void // Updated signature
 }
 
 export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSessionProps) {
@@ -71,18 +73,37 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
     setCurrentExerciseIndex(index)
   }
 
-  const finishWorkout = () => {
+  const finishWorkout = (isFullyCompleted: boolean = true) => {
     setIsActive(false)
-    // Calculate total calories burned
-    const totalCalories = workout.exercises.reduce((total, exercise) => {
-      return total + calculateCalories(exercise, userProfile)
-    }, 0)
 
-    // Show completion summary (you could add a modal here)
-    alert(
-      `Workout Complete!\nTime: ${Math.floor(sessionTime / 60)}:${(sessionTime % 60).toString().padStart(2, "0")}\nCalories Burned: ${totalCalories}`,
-    )
-    onComplete()
+    const finalExercisesPerformed = workout.exercises.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      category: ex.category,
+      reps: ex.reps, // Assuming these are target reps, or actual if tracked
+      weight: ex.weight, // Assuming this is target weight, or actual if tracked
+    }));
+
+    // Use the existing totalCalories calculation which sums up calories for completed exercises
+    // If !isFullyCompleted, this will reflect partial completion.
+    // If isFullyCompleted, it's implied all exercises contributed if they were marked.
+    // The current totalCalories calculation sums up based on `completedExercises` list.
+    const finalTotalCalories = workout.exercises.reduce((total, exercise) => {
+      // if (isFullyCompleted || completedExercises.includes(exercise.id)) { // Ensure all exercises count if "Finish Workout" is hit
+      // For now, stick to only completed ones, or adjust as per desired logic for "Finish Workout" button
+      if (completedExercises.includes(exercise.id)) {
+         return total + calculateCalories(exercise, userProfile);
+      }
+      return total;
+    }, 0);
+
+    const record: WorkoutRecord = {
+      date: new Date().toISOString(),
+      duration: Math.floor(sessionTime / 60), // Convert seconds to minutes
+      exercisesPerformed: finalExercisesPerformed,
+      caloriesBurned: finalTotalCalories,
+    }
+    onComplete(record)
   }
 
   const formatTime = (seconds: number) => {
@@ -103,7 +124,8 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
       {/* Header */}
       <div className="bg-white shadow-sm border-b p-4">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={onComplete}>
+          {/* Updated: Header back button calls finishWorkout with isFullyCompleted = false */}
+          <Button variant="ghost" size="sm" onClick={() => finishWorkout(false) }>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-bold">{workout.day} Workout</h1>
@@ -222,9 +244,13 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
       </div>
 
       {/* Finish Workout */}
+      {/* Button appears when all exercises are marked, or always visible to allow early finish?
+          Current logic: only when all exercises are completed.
+          This means finishWorkout(true) is only called when everything is done.
+      */}
       {completedExercises.length === workout.exercises.length && (
         <div className="p-4">
-          <Button onClick={finishWorkout} className="w-full" size="lg">
+          <Button onClick={() => finishWorkout(true)} className="w-full" size="lg">
             Finish Workout
           </Button>
         </div>
