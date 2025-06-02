@@ -13,13 +13,33 @@ const mockProfileScreenProps = jest.fn();
 const mockAdminDashboardProps = jest.fn();
 const mockLoginScreenProps = jest.fn();
 const mockRegistrationScreenProps = jest.fn();
+const mockSidebarProps = jest.fn(); // For Sidebar
 
 const ALL_USERS_STORAGE_KEY = "allFitnessUsers"; 
 
-// --- Mocks for Authentication Screens ---
+// --- Mocks for Core UI Components ---
+jest.mock("@/components/sidebar", () => ({
+  Sidebar: (props: any) => {
+    mockSidebarProps(props);
+    // Simulate some nav items for testing navigation
+    return (
+      <div>
+        <span>Sidebar</span>
+        <button onClick={() => props.onNavigate("planner")}>Go to Planner (Sidebar)</button>
+        <button onClick={() => props.onNavigate("profile")}>Go to Profile (Sidebar)</button>
+        <button onClick={() => props.onNavigate("trainingHistory")}>Go to History (Sidebar)</button>
+        {props.userProfile?.role === "admin" && (
+          <button onClick={() => props.onNavigate("adminDashboard")}>Go to Admin (Sidebar)</button>
+        )}
+        <button onClick={props.onLogout}>Logout (Sidebar)</button>
+      </div>
+    );
+  }
+}));
+
 jest.mock("@/components/login-screen", () => ({
   LoginScreen: (props: any) => {
-    mockLoginScreenProps(props);
+    mockLoginScreenProps(props); 
     return (
       <div>
         <span>Login Screen</span>
@@ -120,7 +140,12 @@ jest.mock("@/components/workout-session", () => ({
     mockWorkoutSessionOnComplete.mockImplementation(props.onComplete);
     return (
       <button onClick={() => {
-        const sampleRecord: WorkoutRecord = { /* ... */ };
+        const sampleRecord: WorkoutRecord = { 
+          date: new Date().toISOString(), 
+          duration: 33, 
+          exercisesPerformed: [{id: "mockex1", name: "Mock Exercise", category: "test", reps: 10, weight: 50}], 
+          caloriesBurned: 123 
+        };
         props.onComplete(sampleRecord);
       }}>
         Simulate Complete Workout
@@ -307,35 +332,26 @@ describe("FitnessApp Page", () => {
       expect(allUsers.length).toBeGreaterThanOrEqual(1);
     });
     
-    test("handleWorkoutComplete updates user in userProfile and allUserProfiles (admin logged in, testUser does workout)", () => {
-        // For this test, assume testUser is the one doing the workout.
-        // We need to get testUser "logged in" or simulate their workout completion affecting allUserProfiles.
-        // The current setup logs in admin. We'll have admin update testUser's data via other means,
-        // or this test needs a different setup where testUser is logged in.
+    test("handleWorkoutComplete updates user in userProfile and allUserProfiles, including calories", () => {
+        // Logged-in user (admin in this case) completes a workout
+        act(() => { fireEvent.click(screen.getByText("Start Test Workout")); }); // Navigates to workout screen
+        
+        // The mockWorkoutSessionOnComplete will be called with a sample record that includes caloriesBurned: 123
+        act(() => { fireEvent.click(screen.getByText("Simulate Complete Workout")); });
 
-        // Simplified: Test after admin logs in, and we simulate a workout completion for testUser.
-        // This requires handleWorkoutComplete to correctly identify and update the user in allUserProfiles,
-        // even if that user is not the currently logged-in user (which is not its current design).
-        // Re-design: handleWorkoutComplete should only affect the *logged-in* user.
-        // So, let's test with the logged-in admin completing a workout.
-      
-        act(() => { fireEvent.click(screen.getByText("Start Test Workout")); });
-        const workoutRecord: WorkoutRecord = { date: "2024-01-01", duration: 30, exercisesPerformed: [], caloriesBurned: 100 };
-        act(() => { mockWorkoutSessionOnComplete(workoutRecord); });
 
-        const adminProfileStr = localStorageMock.getItem("userProfile"); // Admin is logged in
+        const adminProfileStr = localStorageMock.getItem("userProfile");
         const updatedAdminUser = JSON.parse(adminProfileStr!);
         expect(updatedAdminUser.workoutHistory).toHaveLength(1);
-        expect(updatedAdminUser.workoutHistory[0]).toEqual(workoutRecord);
+        expect(updatedAdminUser.workoutHistory[0].caloriesBurned).toBe(123); // Check calorie persistence
 
         const allUsersStr = localStorageMock.getItem(ALL_USERS_STORAGE_KEY);
         const allUsers = JSON.parse(allUsersStr!);
         const adminInAll = allUsers.find((u: UserProfile) => u.email === expectedAdminUserProfile.email);
         expect(adminInAll.workoutHistory).toHaveLength(1);
-        expect(adminInAll.workoutHistory[0]).toEqual(workoutRecord);
+        expect(adminInAll.workoutHistory[0].caloriesBurned).toBe(123);
     });
   });
-  // --- End tests for allUserProfiles management ---
 
   test("should load OLD userProfile from localStorage and apply defaults (post-login)", () => {
     role: "user",
@@ -570,8 +586,56 @@ describe("FitnessApp Page", () => {
     localStorageMock.setItem("userProfile", JSON.stringify(expectedTestUserProfile));
     render(<FitnessApp />);
     expect(screen.getByText("Weekly Planner")).toBeInTheDocument();
-    act(() => { fireEvent.click(screen.getByText("Logout")); }); // From WeeklyPlanner mock
+    act(() => { fireEvent.click(screen.getByText("Logout from Planner")); }); 
     expect(localStorageMock.getItem("userProfile")).toBeNull();
-    expect(screen.getByText("Complete Sign Up")).toBeInTheDocument();
+    expect(screen.getByText("Login Screen")).toBeInTheDocument(); // Check it navigates to Login
+  });
+
+  // --- Sidebar Navigation Tests ---
+  describe("Sidebar Navigation", () => {
+    beforeEach(() => {
+      localStorageMock.setItem("userProfile", JSON.stringify(expectedTestUserProfile)); // Log in as regular user
+      localStorageMock.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify([expectedTestUserProfile]));
+      render(<FitnessApp />);
+      expect(screen.getByText("Weekly Planner")).toBeInTheDocument(); // Initial screen after login
+    });
+
+    test("Sidebar is rendered when user is logged in", () => {
+      expect(screen.getByText("Sidebar")).toBeInTheDocument(); // From Sidebar mock
+    });
+
+    test("navigating to Profile via Sidebar updates screen and passes correct props", () => {
+      act(() => { fireEvent.click(screen.getByText("Go to Profile (Sidebar)")); });
+      expect(screen.getByText(`Profile Screen for ${expectedTestUserProfile.name}`)).toBeInTheDocument();
+      expect(mockProfileScreenProps).toHaveBeenCalledWith(expect.objectContaining({
+        userProfile: expectedTestUserProfile,
+        loggedInUserRole: "user",
+        isEditingOwnProfile: true,
+      }));
+    });
+
+    test("navigating to Training History via Sidebar updates screen and passes userProfile", () => {
+      act(() => { fireEvent.click(screen.getByText("Go to History (Sidebar)")); });
+      // Assuming TrainingHistoryScreen mock would display something like "Training History Screen"
+      // For now, we check that the placeholder for new screens is shown (as it's not mocked yet)
+      // This test will need to be updated when TrainingHistoryScreen is fully integrated and mocked.
+      // For now, we check the generic placeholder from app/page.tsx
+      expect(screen.getByText(/welcome to traininghistory/i)).toBeInTheDocument(); 
+      // We can also check if mockSidebarProps was called with the correct currentScreen
+      // This requires Sidebar mock to pass currentScreen to mockSidebarProps if we want to check it.
+      // Alternatively, and more directly, check the props of the TrainingHistoryScreen if it were mocked.
+      // Since TrainingHistoryScreen isn't mocked to capture props yet, this is an indirect check.
+    });
+    
+    test("Admin can navigate to Admin Dashboard via Sidebar", () => {
+      // Re-render with admin user
+      localStorageMock.setItem("userProfile", JSON.stringify(expectedAdminUserProfile));
+      localStorageMock.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify([expectedAdminUserProfile]));
+      render(<FitnessApp />);
+      expect(screen.getByText("Weekly Planner")).toBeInTheDocument(); // Initial screen
+      
+      act(() => { fireEvent.click(screen.getByText("Go to Admin (Sidebar)")); });
+      expect(screen.getByText("Admin Dashboard")).toBeInTheDocument(); // From AdminDashboard mock
+    });
   });
 })

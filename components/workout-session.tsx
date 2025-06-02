@@ -7,8 +7,9 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import type { DayWorkout, Exercise, UserProfile } from "@/app/page"
 import { ArrowLeft, CheckCircle, Timer, Flame } from "lucide-react"
+import { calculateCaloriesBurned } from "@/lib/utils" // Import the new calorie calculation utility
 
-import { WorkoutRecord } from "@/app/page"; // Import WorkoutRecord
+import { WorkoutRecord } from "@/app/page"; 
 
 interface WorkoutSessionProps {
   workout: DayWorkout
@@ -37,27 +38,10 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
   const currentExercise = workout.exercises[currentExerciseIndex]
   const progress = (completedExercises.length / workout.exercises.length) * 100
 
-  const calculateCalories = (exercise: Exercise, userProfile: UserProfile) => {
-    // Simplified calorie calculation based on exercise type, weight, and reps
-    const baseCaloriesPerRep = {
-      "Push-ups": 0.5,
-      Squats: 0.6,
-      "Bench Press": 0.8,
-      Deadlift: 1.0,
-      "Pull-ups": 0.7,
-      "Bicep Curls": 0.3,
-      "Shoulder Press": 0.5,
-      Lunges: 0.4,
-      Plank: 0.2,
-      "Leg Press": 0.6,
-    }
-
-    const baseCalories = baseCaloriesPerRep[exercise.name as keyof typeof baseCaloriesPerRep] || 0.5
-    const weightFactor = userProfile.weight / 70 // Normalize to 70kg
-    const weightUsedFactor = exercise.weight > 0 ? 1 + exercise.weight / 50 : 1
-
-    return Math.round(baseCalories * exercise.reps * weightFactor * weightUsedFactor)
-  }
+  // Helper to calculate duration for a single exercise based on reps (3 seconds per rep)
+  const getExerciseDurationMinutes = (reps: number): number => {
+    return (reps * 3) / 60; // Duration in minutes
+  };
 
   const completeExercise = () => {
     if (!completedExercises.includes(currentExercise.id)) {
@@ -87,21 +71,19 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
     // Use the existing totalCalories calculation which sums up calories for completed exercises
     // If !isFullyCompleted, this will reflect partial completion.
     // If isFullyCompleted, it's implied all exercises contributed if they were marked.
-    // The current totalCalories calculation sums up based on `completedExercises` list.
-    const finalTotalCalories = workout.exercises.reduce((total, exercise) => {
-      // if (isFullyCompleted || completedExercises.includes(exercise.id)) { // Ensure all exercises count if "Finish Workout" is hit
-      // For now, stick to only completed ones, or adjust as per desired logic for "Finish Workout" button
-      if (completedExercises.includes(exercise.id)) {
-         return total + calculateCalories(exercise, userProfile);
+    let totalCaloriesBurnedForSession = 0;
+    workout.exercises.forEach(exercise => {
+      if (completedExercises.includes(exercise.id) || isFullyCompleted) { // If fully completed, count all exercises
+        const exerciseDurationMinutes = getExerciseDurationMinutes(exercise.reps);
+        totalCaloriesBurnedForSession += calculateCaloriesBurned(exercise, userProfile.weight, exerciseDurationMinutes);
       }
-      return total;
-    }, 0);
-
+    });
+    
     const record: WorkoutRecord = {
       date: new Date().toISOString(),
-      duration: Math.floor(sessionTime / 60), // Convert seconds to minutes
+      duration: Math.floor(sessionTime / 60), 
       exercisesPerformed: finalExercisesPerformed,
-      caloriesBurned: finalTotalCalories,
+      caloriesBurned: totalCaloriesBurnedForSession,
     }
     onComplete(record)
   }
@@ -112,12 +94,14 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  const totalCalories = workout.exercises.reduce((total, exercise) => {
+  // Calculate total calories for UI display (dynamic based on completed exercises)
+  const currentDisplayedTotalCalories = workout.exercises.reduce((total, exercise) => {
     if (completedExercises.includes(exercise.id)) {
-      return total + calculateCalories(exercise, userProfile)
+      const exerciseDurationMinutes = getExerciseDurationMinutes(exercise.reps);
+      return total + calculateCaloriesBurned(exercise, userProfile.weight, exerciseDurationMinutes);
     }
-    return total
-  }, 0)
+    return total;
+  }, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,7 +135,7 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-1">
                   <Flame className="h-4 w-4 text-orange-500" />
-                  <span>{totalCalories} calories</span>
+                  <span>{currentDisplayedTotalCalories} calories</span>
                 </div>
                 <span className="text-gray-600">{Math.round(progress)}% complete</span>
               </div>
@@ -188,7 +172,9 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
                     <p className="text-sm text-gray-600">kg</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{calculateCalories(currentExercise, userProfile)}</p>
+                    <p className="text-2xl font-bold">
+                      {calculateCaloriesBurned(currentExercise, userProfile.weight, getExerciseDurationMinutes(currentExercise.reps))}
+                    </p>
                     <p className="text-sm text-gray-600">cal</p>
                   </div>
                 </div>
@@ -235,7 +221,7 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
                   </div>
                 </div>
                 <Badge variant={completedExercises.includes(exercise.id) ? "default" : "secondary"}>
-                  {calculateCalories(exercise, userProfile)} cal
+                  {calculateCaloriesBurned(exercise, userProfile.weight, getExerciseDurationMinutes(exercise.reps))} cal
                 </Badge>
               </div>
             </CardContent>

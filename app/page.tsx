@@ -8,6 +8,11 @@ import { WeeklyPlanner } from "@/components/weekly-planner"
 import { WorkoutSession } from "@/components/workout-session"
 import { ProfileScreen } from "@/components/profile-screen"
 import { AdminDashboard } from "@/components/admin-dashboard"
+import { Sidebar, SidebarNavigationScreen } from "@/components/sidebar"
+import { BookingScreen } from "@/components/booking-screen" // Import new screens
+import { TrainingHistoryScreen } from "@/components/training-history-screen"
+import { CreateRoutineScreen } from "@/components/create-routine-screen"
+import { PreMadeRoutinesScreen } from "@/components/pre-made-routines-screen"
 
 export type UserProfile = {
   name: string
@@ -45,7 +50,7 @@ export type Exercise = {
   reps: number
   weight: number
   calories?: number
-  mets?: number // Added METS as it's in the DB and likely needed for calorie calculation
+  metsValue?: number // Renamed from mets to metsValue as per subtask
 }
 
 export type DayWorkout = {
@@ -60,8 +65,11 @@ export type WeeklyPlan = {
 
 const ALL_USERS_STORAGE_KEY = "allFitnessUsers";
 
+// Ensure this union type includes all keys from SidebarNavigationScreen plus others like "login", "registration", "workout"
+type AppScreen = SidebarNavigationScreen | "login" | "registration" | "workout";
+
 export default function FitnessApp() {
-  const [currentScreen, setCurrentScreen] = useState<"login" | "registration" | "planner" | "workout" | "profile" | "adminDashboard">("login");
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>("login");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [allUserProfiles, setAllUserProfiles] = useState<UserProfile[]>([]);
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
@@ -209,9 +217,25 @@ export default function FitnessApp() {
     }
   };
 
+  const handleSidebarNavigate = (screen: SidebarNavigationScreen) => {
+    if (screen === "profile") {
+      handleViewOwnProfile(); // Uses existing logic to ensure viewingProfile is cleared
+    } else if (screen === "adminDashboard") {
+      handleNavigateToAdminDashboard();
+    } else {
+      // For other screens like "planner", "booking", etc.
+      // Make sure to clear viewingProfile if admin was viewing someone else
+      if (viewingProfile) {
+        setViewingProfile(null);
+      }
+      setCurrentScreen(screen);
+    }
+  };
+
   // --- Admin Specific Handlers (Keep these) ---
   const handleNavigateToAdminDashboard = () => {
     if (userProfile?.role === "admin") {
+      setViewingProfile(null); // Clear any viewed profile when going to dashboard
       setCurrentScreen("adminDashboard");
     }
   };
@@ -251,64 +275,78 @@ export default function FitnessApp() {
   // Determine which profile to display on ProfileScreen
   const profileToDisplayOnScreen = viewingProfile || userProfile;
 
+  // Render authentication screens if no user profile
+  if (!userProfile) {
+    if (currentScreen === "registration") {
+      return <RegistrationScreen onRegister={handleRegister} onNavigateToLogin={navigateToLogin} />;
+    }
+    // Default to Login screen if not logged in, or if currentScreen is login
+    return <LoginScreen onLogin={handleLogin} onNavigateToRegister={navigateToRegister} error={loginError} />;
+  }
+
+  // Render main app layout with Sidebar if user is logged in
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* --- Authentication Screens --- */}
-      {currentScreen === "login" && !userProfile && (
-        <LoginScreen 
-          onLogin={handleLogin} 
-          onNavigateToRegister={navigateToRegister} 
-          error={loginError} 
-        />
-      )}
-      {currentScreen === "registration" && !userProfile && (
-        <RegistrationScreen 
-          onRegister={handleRegister} 
-          onNavigateToLogin={navigateToLogin} 
-        />
-      )}
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar
+        currentScreen={currentScreen}
+        onNavigate={handleSidebarNavigate}
+        onLogout={handleLogout}
+        userProfile={userProfile}
+      />
+      <main className="flex-1 p-6 overflow-y-auto">
+        {currentScreen === "planner" && (
+          <WeeklyPlanner
+            userProfile={userProfile}
+            weeklyPlans={weeklyPlans}
+            onUpdatePlans={updateWeeklyPlans}
+            onStartWorkout={handleStartWorkout}
+            onViewProfile={handleViewOwnProfile} 
+            onLogout={handleLogout} // Logout can also be triggered from here if needed, or rely on Sidebar's
+            onNavigateToAdminDashboard={handleNavigateToAdminDashboard} // For admin button within planner
+          />
+        )}
 
-      {/* --- Logged-in User Screens --- */}
-      {userProfile && currentScreen === "planner" && (
-        <WeeklyPlanner
-          userProfile={userProfile}
-          weeklyPlans={weeklyPlans}
-          onUpdatePlans={updateWeeklyPlans}
-          onStartWorkout={handleStartWorkout}
-          // onBackToSignup is removed, logout goes to login
-          onViewProfile={handleViewOwnProfile} 
-          onLogout={handleLogout}
-          onNavigateToAdminDashboard={handleNavigateToAdminDashboard}
-        />
-      )}
+        {currentScreen === "workout" && currentWorkout && (
+          <WorkoutSession workout={currentWorkout} userProfile={userProfile} onComplete={handleWorkoutComplete} />
+        )}
 
-      {currentScreen === "workout" && currentWorkout && userProfile && (
-        <WorkoutSession workout={currentWorkout} userProfile={userProfile} onComplete={handleWorkoutComplete} />
-      )}
+        {currentScreen === "profile" && profileToDisplayOnScreen && (
+          <ProfileScreen 
+            userProfile={profileToDisplayOnScreen} 
+            onBackToPlanner={handleProfileScreenBack} 
+            onLogout={handleLogout} // Logout can also be triggered from here
+            loggedInUserRole={userProfile.role}
+            isEditingOwnProfile={profileToDisplayOnScreen.email === userProfile.email}
+            onUpdateUserProfile={handleUpdateUserProfile}
+          />
+        )}
 
-      {currentScreen === "profile" && profileToDisplayOnScreen && userProfile && (
-        <ProfileScreen 
-          userProfile={profileToDisplayOnScreen} 
-          onBackToPlanner={handleProfileScreenBack} // Updated handler
-          onLogout={handleLogout}
-          loggedInUserRole={userProfile.role}
-          isEditingOwnProfile={profileToDisplayOnScreen.email === userProfile.email}
-          onUpdateUserProfile={handleUpdateUserProfile}
-        />
-      )}
+        {currentScreen === "adminDashboard" && userProfile.role === "admin" && (
+          <AdminDashboard 
+            allUsers={allUserProfiles.filter(u => u.email !== userProfile.email)} 
+            onViewUserProfile={handleViewUserProfileFromAdmin}
+            onLogout={handleLogout} // Logout can also be triggered from here
+          />
+        )}
+        {/* Fallback for non-admin trying to access adminDashboard - handled by Sidebar/navigation logic */}
+        {currentScreen === "adminDashboard" && userProfile.role !== "admin" && (
+             <>{handleSidebarNavigate("planner")}</> // Or an Access Denied component
+        )}
 
-      {currentScreen === "adminDashboard" && userProfile?.role === "admin" && (
-        <AdminDashboard 
-          allUsers={allUserProfiles.filter(u => u.email !== userProfile.email)} // Show other users
-          onViewUserProfile={handleViewUserProfileFromAdmin}
-          onLogout={handleLogout}
-        />
-      )}
-       {/* Fallback for non-admin trying to access adminDashboard or other invalid states */}
-      {currentScreen === "adminDashboard" && userProfile?.role !== "admin" && (
-        // Redirect to planner or show error
-        <>{setCurrentScreen("planner")}</> 
-      )}
+        {currentScreen === "booking" && <BookingScreen />}
+        {currentScreen === "trainingHistory" && <TrainingHistoryScreen userProfile={userProfile} />}
+        {currentScreen === "createRoutine" && <CreateRoutineScreen />}
+        {currentScreen === "preMadeRoutines" && <PreMadeRoutinesScreen />}
+        
+        {/* Fallback for any unhandled valid screen type, or just rely on default case of navigation */}
+        {!(["planner", "workout", "profile", "adminDashboard", "booking", "trainingHistory", "createRoutine", "preMadeRoutines"].includes(currentScreen)) && 
+          currentScreen !== "login" && currentScreen !== "registration" && (
+          <div className="text-center p-10">
+            <h1 className="text-2xl font-semibold">Page not found or under construction</h1>
+            <p className="text-gray-600">Please select an option from the sidebar.</p>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
