@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { UserProfile, WeeklyPlan, DayWorkout } from "@/app/page"
 import { ExerciseManager } from "@/components/exercise-manager"
-import { Calendar, Plus, Play, User, ChevronLeft, ChevronRight, LogOut } from "lucide-react" // Import LogOut
+import { Calendar, Plus, Play, User, ChevronLeft, ChevronRight, LogOut, ShieldCheck } from "lucide-react" // Import ShieldCheck
 
 interface WeeklyPlannerProps {
   userProfile: UserProfile
@@ -15,7 +15,8 @@ interface WeeklyPlannerProps {
   onStartWorkout: (workout: DayWorkout) => void
   onBackToSignup: () => void
   onViewProfile: () => void
-  onLogout: () => void // Added onLogout
+  onLogout: () => void
+  onNavigateToAdminDashboard?: () => void // New prop
 }
 
 export function WeeklyPlanner({
@@ -25,7 +26,8 @@ export function WeeklyPlanner({
   onStartWorkout,
   onBackToSignup,
   onViewProfile,
-  onLogout, // Added onLogout
+  onLogout,
+  onNavigateToAdminDashboard, // New prop
 }: WeeklyPlannerProps) {
   const [currentWeek, setCurrentWeek] = useState(getCurrentWeek())
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
@@ -101,10 +103,18 @@ export function WeeklyPlanner({
       <div className="bg-white shadow-sm border-b">
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" size="sm" onClick={onViewProfile}>
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={onViewProfile}>
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </Button>
+              {userProfile.role === "admin" && onNavigateToAdminDashboard && (
+                <Button variant="ghost" size="sm" onClick={onNavigateToAdminDashboard}>
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Admin
+                </Button>
+              )}
+            </div>
             <h1 className="text-xl font-bold">Weekly Planner</h1>
             <Button variant="ghost" size="sm" onClick={onLogout}>
               <LogOut className="h-4 w-4 mr-2" />

@@ -25,6 +25,15 @@ describe("WeeklyPlanner Component", () => {
     height: 165,
     activityLevel: "light",
     fitnessGoals: ["stay active"],
+    role: "user", // Default role for this mock
+    membershipType: "trial",
+    workoutHistory: [],
+  }
+
+  const mockAdminUserProfile: UserProfile = {
+    ...mockUserProfile,
+    role: "admin",
+    email: "admin@example.com",
   }
 
   const mockWeeklyPlans: WeeklyPlan[] = []
@@ -33,23 +42,32 @@ describe("WeeklyPlanner Component", () => {
   const mockOnBackToSignup = jest.fn()
   const mockOnViewProfile = jest.fn()
   const mockOnLogout = jest.fn()
+  const mockOnNavigateToAdminDashboard = jest.fn()
 
-  beforeEach(() => {
-    mockOnLogout.mockClear()
-    mockOnViewProfile.mockClear() // Also clear other mocks used in header
-    mockOnBackToSignup.mockClear()
 
+  // Helper to render with specific props for role tests
+  const renderPlanner = (profile: UserProfile, navCallback?: () => void) => {
     render(
       <WeeklyPlanner
-        userProfile={mockUserProfile}
+        userProfile={profile}
         weeklyPlans={mockWeeklyPlans}
         onUpdatePlans={mockOnUpdatePlans}
         onStartWorkout={mockOnStartWorkout}
-        onBackToSignup={mockOnBackToSignup} // Though not directly tested, good practice to pass all required
+        onBackToSignup={mockOnBackToSignup}
         onViewProfile={mockOnViewProfile}
         onLogout={mockOnLogout}
+        onNavigateToAdminDashboard={navCallback}
       />
-    )
+    );
+  }
+
+  beforeEach(() => {
+    mockOnLogout.mockClear();
+    mockOnViewProfile.mockClear();
+    mockOnBackToSignup.mockClear();
+    mockOnNavigateToAdminDashboard.mockClear();
+    // Default render for simple tests, specific tests will re-render
+    renderPlanner(mockUserProfile, mockOnNavigateToAdminDashboard);
   })
 
   test('renders header with "Weekly Planner" title', () => {
@@ -84,6 +102,27 @@ describe("WeeklyPlanner Component", () => {
     const navButtons = screen.getAllByRole("button")
     expect(navButtons.some(button => button.innerHTML.includes("ChevronLeft"))).toBe(true)
     expect(navButtons.some(button => button.innerHTML.includes("ChevronRight"))).toBe(true)
-
   })
+
+  describe("Admin Dashboard Button", () => {
+    test("is visible and calls onNavigateToAdminDashboard for admin user", () => {
+      // Re-render with admin profile and callback
+      renderPlanner(mockAdminUserProfile, mockOnNavigateToAdminDashboard);
+      const adminButton = screen.getByRole("button", { name: /admin/i });
+      expect(adminButton).toBeInTheDocument();
+      fireEvent.click(adminButton);
+      expect(mockOnNavigateToAdminDashboard).toHaveBeenCalledTimes(1);
+    });
+
+    test("is not visible for non-admin user", () => {
+      // mockUserProfile is already non-admin, ensure it was rendered in beforeEach or re-render
+      renderPlanner(mockUserProfile, mockOnNavigateToAdminDashboard);
+      expect(screen.queryByRole("button", { name: /admin/i })).not.toBeInTheDocument();
+    });
+
+    test("is not visible if onNavigateToAdminDashboard is not provided, even for admin", () => {
+      renderPlanner(mockAdminUserProfile, undefined); // No callback provided
+      expect(screen.queryByRole("button", { name: /admin/i })).not.toBeInTheDocument();
+    });
+  });
 })
