@@ -21,6 +21,7 @@ describe("AdminDashboard Component", () => {
       role: "user",
       membershipType: "premium",
       workoutHistory: [],
+      password: "password123",
     },
     {
       name: "Bob The Builder",
@@ -34,6 +35,7 @@ describe("AdminDashboard Component", () => {
       role: "user",
       membershipType: "basic",
       workoutHistory: [],
+      password: "password456",
     },
     {
       name: "Charlie Admin",
@@ -47,6 +49,7 @@ describe("AdminDashboard Component", () => {
       role: "admin",
       membershipType: "trial",
       workoutHistory: [],
+      password: "password789",
     },
   ]
 
@@ -66,7 +69,7 @@ describe("AdminDashboard Component", () => {
     render(<AdminDashboard allUsers={[]} onViewUserProfile={mockOnViewUserProfile} onLogout={mockOnLogout} />)
     expect(screen.getByText("No users found.")).toBeInTheDocument()
   })
-
+  
   test("displays 'No users found.' message when allUsers is undefined", () => {
     render(<AdminDashboard allUsers={undefined as any} onViewUserProfile={mockOnViewUserProfile} onLogout={mockOnLogout} />)
     expect(screen.getByText("No users found.")).toBeInTheDocument()
@@ -93,7 +96,7 @@ describe("AdminDashboard Component", () => {
 
   test("calls onViewUserProfile with correct email when 'View/Edit' button is clicked", () => {
     render(<AdminDashboard allUsers={mockUsers} onViewUserProfile={mockOnViewUserProfile} onLogout={mockOnLogout} />)
-
+    
     const viewEditButtons = screen.getAllByRole("button", { name: /view\/edit/i })
     expect(viewEditButtons.length).toBe(mockUsers.length)
 

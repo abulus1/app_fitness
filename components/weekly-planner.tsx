@@ -13,10 +13,10 @@ interface WeeklyPlannerProps {
   weeklyPlans: WeeklyPlan[]
   onUpdatePlans: (plans: WeeklyPlan[]) => void
   onStartWorkout: (workout: DayWorkout) => void
-  onBackToSignup: () => void
+  // onBackToSignup: () => void, // Removed
   onViewProfile: () => void
   onLogout: () => void
-  onNavigateToAdminDashboard?: () => void // New prop
+  onNavigateToAdminDashboard?: () => void
 }
 
 export function WeeklyPlanner({
@@ -24,10 +24,10 @@ export function WeeklyPlanner({
   weeklyPlans,
   onUpdatePlans,
   onStartWorkout,
-  onBackToSignup,
+  // onBackToSignup, // Removed
   onViewProfile,
   onLogout,
-  onNavigateToAdminDashboard, // New prop
+  onNavigateToAdminDashboard,
 }: WeeklyPlannerProps) {
   const [currentWeek, setCurrentWeek] = useState(getCurrentWeek())
   const [selectedDay, setSelectedDay] = useState<string | null>(null)

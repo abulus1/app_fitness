@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react" // Import useEffect
-import { SignUpScreen } from "@/components/signup-screen"
+import { useState, useEffect } from "react"
+// Remove SignUpScreen, Add LoginScreen and RegistrationScreen
+import { LoginScreen, LoginCredentials } from "@/components/login-screen" 
+import { RegistrationScreen, RegistrationData } from "@/components/registration-screen"
 import { WeeklyPlanner } from "@/components/weekly-planner"
 import { WorkoutSession } from "@/components/workout-session"
 import { ProfileScreen } from "@/components/profile-screen"
-import { AdminDashboard } from "@/components/admin-dashboard" // Import AdminDashboard
+import { AdminDashboard } from "@/components/admin-dashboard"
 
 export type UserProfile = {
   name: string
@@ -19,6 +21,7 @@ export type UserProfile = {
   role: "admin" | "user"
   membershipType: "basic" | "premium" | "trial"
   workoutHistory: WorkoutRecord[]
+  password?: string // Added password, make it optional for now for easier adoption
 }
 
 export type WorkoutRecord = {
@@ -58,15 +61,15 @@ export type WeeklyPlan = {
 const ALL_USERS_STORAGE_KEY = "allFitnessUsers";
 
 export default function FitnessApp() {
-  const [currentScreen, setCurrentScreen] = useState<"signup" | "planner" | "workout" | "profile" | "adminDashboard">("signup");
+  const [currentScreen, setCurrentScreen] = useState<"login" | "registration" | "planner" | "workout" | "profile" | "adminDashboard">("login");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [allUserProfiles, setAllUserProfiles] = useState<UserProfile[]>([]);
-  const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null); // For admin viewing other profiles
+  const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlan[]>([]);
   const [currentWorkout, setCurrentWorkout] = useState<DayWorkout | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load all users first
     const storedAllUsers = localStorage.getItem(ALL_USERS_STORAGE_KEY);
     let currentAllUsers: UserProfile[] = [];
     if (storedAllUsers) {
@@ -74,53 +77,91 @@ export default function FitnessApp() {
       setAllUserProfiles(currentAllUsers);
     }
 
-    // Load logged-in user profile
     const storedProfile = localStorage.getItem("userProfile");
     if (storedProfile) {
       let loadedProfile = JSON.parse(storedProfile) as UserProfile;
       loadedProfile.role = loadedProfile.role || "user";
       loadedProfile.membershipType = loadedProfile.membershipType || "trial";
       loadedProfile.workoutHistory = loadedProfile.workoutHistory || [];
+      loadedProfile.password = loadedProfile.password || "defaultPassword";
       setUserProfile(loadedProfile);
-      setCurrentScreen("planner");
+      setCurrentScreen("planner"); // User is logged in, go to planner
 
-      // Ensure logged-in user is in allUserProfiles list
       const loggedInUserInAllUsers = currentAllUsers.find(u => u.email === loadedProfile.email);
       if (!loggedInUserInAllUsers) {
         const updatedAllUsers = [...currentAllUsers, loadedProfile];
         setAllUserProfiles(updatedAllUsers);
         localStorage.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify(updatedAllUsers));
       }
+    } else {
+      setCurrentScreen("login"); // No stored profile, default to login screen
     }
   }, []);
 
-  const handleSignUpComplete = (partialProfile: Omit<UserProfile, "role" | "membershipType" | "workoutHistory">) => {
-    const isAdmin = partialProfile.email === "admin@example.com";
-    const completedProfile: UserProfile = {
-      ...partialProfile,
-      role: isAdmin ? "admin" : "user",
-      membershipType: "trial",
-      workoutHistory: [],
-    };
-    setUserProfile(completedProfile);
-    localStorage.setItem("userProfile", JSON.stringify(completedProfile));
-
-    // Add to allUserProfiles list and save
-    setAllUserProfiles(prevAllUsers => {
-      const existingUserIndex = prevAllUsers.findIndex(u => u.email === completedProfile.email);
-      let updatedAllUsers;
-      if (existingUserIndex > -1) {
-        updatedAllUsers = [...prevAllUsers];
-        updatedAllUsers[existingUserIndex] = completedProfile;
-      } else {
-        updatedAllUsers = [...prevAllUsers, completedProfile];
-      }
-      localStorage.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify(updatedAllUsers));
-      return updatedAllUsers;
-    });
-    setCurrentScreen("planner");
+  // --- Authentication Handlers ---
+  const navigateToLogin = () => {
+    setCurrentScreen("login");
+    setLoginError(null);
+    setViewingProfile(null); 
   };
 
+  const navigateToRegister = () => {
+    setCurrentScreen("registration");
+    setLoginError(null);
+  };
+
+  const handleRegister = (registrationData: RegistrationData) => {
+    const emailExists = allUserProfiles.find(u => u.email === registrationData.email);
+    if (emailExists) {
+      // In a real app, RegistrationScreen would have an error prop to show this
+      alert("Email already exists. Please try a different email or login."); 
+      return;
+    }
+
+    const newUser: UserProfile = {
+      name: registrationData.name,
+      email: registrationData.email,
+      password: registrationData.password, // Password is now set during registration
+      role: registrationData.role, // Role is set during registration
+      age: 0, // Default, to be updated in profile
+      gender: "other", // Default
+      weight: 0, // Default
+      height: 0, // Default
+      activityLevel: "sedentary", // Default
+      fitnessGoals: [], // Default
+      membershipType: "trial", // Default
+      workoutHistory: [], // Default
+    };
+
+    const updatedAllUsers = [...allUserProfiles, newUser];
+    setAllUserProfiles(updatedAllUsers);
+    localStorage.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify(updatedAllUsers));
+    
+    alert("Registration successful! Please login."); // Or directly log them in
+    navigateToLogin();
+  };
+
+  const handleLogin = (credentials: LoginCredentials) => {
+    const foundUser = allUserProfiles.find(u => u.email === credentials.email);
+
+    if (foundUser && foundUser.password === credentials.password) {
+      setUserProfile(foundUser);
+      localStorage.setItem("userProfile", JSON.stringify(foundUser));
+      setCurrentScreen("planner");
+      setLoginError(null);
+    } else {
+      setLoginError("Invalid email or password.");
+    }
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem("userProfile");
+    setUserProfile(null);
+    setViewingProfile(null);
+    navigateToLogin(); // Navigate to login screen after logout
+  };
+
+  // --- Core App Logic Handlers (Keep these) ---
   const handleStartWorkout = (workout: DayWorkout) => {
     setCurrentWorkout(workout);
     setCurrentScreen("workout");
@@ -137,7 +178,7 @@ export default function FitnessApp() {
 
       // Update this user in the allUserProfiles list
       setAllUserProfiles(prevAllUsers => {
-        const updatedAllUsers = prevAllUsers.map(u =>
+        const updatedAllUsers = prevAllUsers.map(u => 
           u.email === updatedLoggedInProfile.email ? updatedLoggedInProfile : u
         );
         localStorage.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify(updatedAllUsers));
@@ -147,7 +188,7 @@ export default function FitnessApp() {
     setCurrentWorkout(null);
     setCurrentScreen("planner");
   };
-
+  
   // Placeholder for updateWeeklyPlans - ensure it also updates allUserProfiles if plans are part of UserProfile
   const updateWeeklyPlans = (plans: WeeklyPlan[]) => {
     setWeeklyPlans(plans);
@@ -168,15 +209,7 @@ export default function FitnessApp() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("userProfile");
-    setUserProfile(null);
-    setViewingProfile(null); // Clear any viewed profile on logout
-    // allUserProfiles remains in localStorage for other users / next login
-    setCurrentScreen("signup");
-  };
-
-  // --- Admin Specific Handlers ---
+  // --- Admin Specific Handlers (Keep these) ---
   const handleNavigateToAdminDashboard = () => {
     if (userProfile?.role === "admin") {
       setCurrentScreen("adminDashboard");
@@ -190,7 +223,7 @@ export default function FitnessApp() {
       setCurrentScreen("profile");
     }
   };
-
+  
   const handleUpdateUserProfile = (updatedProfileData: UserProfile) => {
     // If admin is editing another user (viewingProfile is set and is not the admin themselves)
     if (viewingProfile && viewingProfile.email !== userProfile?.email) {
@@ -220,18 +253,32 @@ export default function FitnessApp() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {currentScreen === "signup" && <SignUpScreen onComplete={handleSignUpComplete} />}
+      {/* --- Authentication Screens --- */}
+      {currentScreen === "login" && !userProfile && (
+        <LoginScreen 
+          onLogin={handleLogin} 
+          onNavigateToRegister={navigateToRegister} 
+          error={loginError} 
+        />
+      )}
+      {currentScreen === "registration" && !userProfile && (
+        <RegistrationScreen 
+          onRegister={handleRegister} 
+          onNavigateToLogin={navigateToLogin} 
+        />
+      )}
 
-      {currentScreen === "planner" && userProfile && (
+      {/* --- Logged-in User Screens --- */}
+      {userProfile && currentScreen === "planner" && (
         <WeeklyPlanner
           userProfile={userProfile}
           weeklyPlans={weeklyPlans}
           onUpdatePlans={updateWeeklyPlans}
           onStartWorkout={handleStartWorkout}
-          onBackToSignup={() => { /* This might need review - should it clear viewingProfile? */ setCurrentScreen("signup"); setViewingProfile(null); }}
-          onViewProfile={handleViewOwnProfile}
+          // onBackToSignup is removed, logout goes to login
+          onViewProfile={handleViewOwnProfile} 
           onLogout={handleLogout}
-          onNavigateToAdminDashboard={handleNavigateToAdminDashboard} // New Prop
+          onNavigateToAdminDashboard={handleNavigateToAdminDashboard}
         />
       )}
 
@@ -240,8 +287,8 @@ export default function FitnessApp() {
       )}
 
       {currentScreen === "profile" && profileToDisplayOnScreen && userProfile && (
-        <ProfileScreen
-          userProfile={profileToDisplayOnScreen}
+        <ProfileScreen 
+          userProfile={profileToDisplayOnScreen} 
           onBackToPlanner={handleProfileScreenBack} // Updated handler
           onLogout={handleLogout}
           loggedInUserRole={userProfile.role}
@@ -251,7 +298,7 @@ export default function FitnessApp() {
       )}
 
       {currentScreen === "adminDashboard" && userProfile?.role === "admin" && (
-        <AdminDashboard
+        <AdminDashboard 
           allUsers={allUserProfiles.filter(u => u.email !== userProfile.email)} // Show other users
           onViewUserProfile={handleViewUserProfileFromAdmin}
           onLogout={handleLogout}
@@ -260,7 +307,7 @@ export default function FitnessApp() {
        {/* Fallback for non-admin trying to access adminDashboard or other invalid states */}
       {currentScreen === "adminDashboard" && userProfile?.role !== "admin" && (
         // Redirect to planner or show error
-        <>{setCurrentScreen("planner")}</>
+        <>{setCurrentScreen("planner")}</> 
       )}
     </div>
   );
