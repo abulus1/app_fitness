@@ -31,37 +31,85 @@ export function ProfileScreen({
   isEditingOwnProfile,
   onUpdateUserProfile,
 }: ProfileScreenProps) {
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [formData, setFormData] = useState<Partial<UserProfile>>(userProfile)
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState<Partial<UserProfile>>(userProfile);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Reset formData when userProfile changes or edit mode is toggled off
-    setFormData(userProfile)
-  }, [userProfile, isEditMode])
+    setFormData(userProfile);
+    // Reset password fields when not in edit mode or when userProfile changes
+    if (!isEditMode || userProfile !== formData) { 
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setPasswordChangeError(null);
+    }
+  }, [userProfile, isEditMode]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = event.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
-
+  
   const handleSelectChange = (name: keyof UserProfile, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const handleEdit = () => setIsEditMode(true)
-
+  
   const handleCancel = () => {
-    setIsEditMode(false)
-    setFormData(userProfile) // Reset changes
-  }
+    setIsEditMode(false);
+    setFormData(userProfile);
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setPasswordChangeError(null);
+  };
 
   const handleSave = () => {
-    if (onUpdateUserProfile) {
-      onUpdateUserProfile(formData as UserProfile) // Assuming formData is complete enough or backend handles partials
-    }
-    setIsEditMode(false)
-  }
+    setPasswordChangeError(null); // Clear previous password error
 
+    let profileToSave: UserProfile = {
+      ...userProfile, // Base with original non-editable fields
+      ...formData,
+      age: Number(formData.age) || userProfile.age,
+      weight: Number(formData.weight) || userProfile.weight,
+      height: Number(formData.height) || userProfile.height,
+      fitnessGoals: typeof formData.fitnessGoals === 'string' 
+        ? formData.fitnessGoals.split(',').map(goal => goal.trim()).filter(goal => goal) 
+        : userProfile.fitnessGoals,
+      email: isAdminEditing ? (formData.email || userProfile.email) : userProfile.email,
+      membershipType: isAdminEditing ? (formData.membershipType || userProfile.membershipType) : userProfile.membershipType,
+      // Role is handled below if admin is editing
+    };
+    
+    if (isAdminEditing) {
+        profileToSave.role = formData.role || userProfile.role;
+    } else {
+        profileToSave.role = userProfile.role; // Ensure role is not changed by non-admin
+    }
+
+    if (newPassword) {
+      if (newPassword !== confirmNewPassword) {
+        setPasswordChangeError("New passwords do not match.");
+        return; // Don't save if passwords don't match
+      }
+      if (newPassword.length < 6) {
+        setPasswordChangeError("New password must be at least 6 characters long.");
+        return;
+      }
+      profileToSave.password = newPassword; // Include new password
+    }
+
+    if (onUpdateUserProfile) {
+      onUpdateUserProfile(profileToSave);
+    }
+    setIsEditMode(false);
+    setNewPassword(""); // Clear password fields after save attempt
+    setConfirmNewPassword("");
+    // passwordChangeError is already cleared or set above
+  };
+  
   const canEditProfile = loggedInUserRole === "admin" || isEditingOwnProfile;
   const isAdminEditing = loggedInUserRole === "admin";
 
@@ -190,8 +238,38 @@ export function ProfileScreen({
                 <p>{userProfile.membershipType.charAt(0).toUpperCase() + userProfile.membershipType.slice(1)}</p>
               )}
             </div>
-            <p><strong>Role:</strong> {userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1)}</p>
+            <div>
+              <Label htmlFor="role">Role</Label>
+              {isEditMode && isAdminEditing ? (
+                 <Select name="role" value={formData.role || ""} onValueChange={(value) => handleSelectChange("role" as keyof UserProfile, value)}>
+                  <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p>{userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1)}</p>
+              )}
+            </div>
           </div>
+          
+          {isEditMode && (isEditingOwnProfile || isAdminEditing) && (
+            <div className="space-y-2 border-t pt-6 mt-6">
+              <h3 className="text-lg font-semibold">Change Password</h3>
+              {passwordChangeError && (
+                <p className="text-sm text-destructive">{passwordChangeError}</p>
+              )}
+              <div>
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password (min. 6 chars)"/>
+              </div>
+              <div>
+                <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                <Input id="confirmNewPassword" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Confirm new password"/>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Workout History</h3>
@@ -226,7 +304,7 @@ export function ProfileScreen({
               <p className="text-sm text-gray-500">No workouts recorded yet.</p>
             )}
           </div>
-
+          
           <div className="space-y-2">
             <h3 className="text-lg font-semibold">Progress Stats</h3>
             <p className="text-sm text-gray-500">Check back later!</p>

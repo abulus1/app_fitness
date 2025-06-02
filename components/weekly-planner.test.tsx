@@ -28,18 +28,20 @@ describe("WeeklyPlanner Component", () => {
     role: "user", // Default role for this mock
     membershipType: "trial",
     workoutHistory: [],
+    password: "password123", // Added password
   }
-
+  
   const mockAdminUserProfile: UserProfile = {
-    ...mockUserProfile,
+    ...mockUserProfile, // This will copy password from mockUserProfile
     role: "admin",
     email: "admin@example.com",
+    // password will be "password123" from mockUserProfile spread
   }
 
   const mockWeeklyPlans: WeeklyPlan[] = []
   const mockOnUpdatePlans = jest.fn()
   const mockOnStartWorkout = jest.fn()
-  const mockOnBackToSignup = jest.fn()
+  // const mockOnBackToSignup = jest.fn(); // Removed
   const mockOnViewProfile = jest.fn()
   const mockOnLogout = jest.fn()
   const mockOnNavigateToAdminDashboard = jest.fn()
@@ -53,7 +55,7 @@ describe("WeeklyPlanner Component", () => {
         weeklyPlans={mockWeeklyPlans}
         onUpdatePlans={mockOnUpdatePlans}
         onStartWorkout={mockOnStartWorkout}
-        onBackToSignup={mockOnBackToSignup}
+        // onBackToSignup={mockOnBackToSignup} // Removed
         onViewProfile={mockOnViewProfile}
         onLogout={mockOnLogout}
         onNavigateToAdminDashboard={navCallback}
@@ -64,7 +66,7 @@ describe("WeeklyPlanner Component", () => {
   beforeEach(() => {
     mockOnLogout.mockClear();
     mockOnViewProfile.mockClear();
-    mockOnBackToSignup.mockClear();
+    // mockOnBackToSignup.mockClear(); // Removed
     mockOnNavigateToAdminDashboard.mockClear();
     // Default render for simple tests, specific tests will re-render
     renderPlanner(mockUserProfile, mockOnNavigateToAdminDashboard);
@@ -80,7 +82,7 @@ describe("WeeklyPlanner Component", () => {
     fireEvent.click(profileButton)
     expect(mockOnViewProfile).toHaveBeenCalledTimes(1)
   })
-
+  
   test('renders "Logout" button and calls onLogout when clicked', () => {
     // The text "Logout" is within the button, not its accessible name if an icon is present first.
     // We can find it by text content or a more specific selector if needed.

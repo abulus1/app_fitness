@@ -22,6 +22,7 @@ describe("WorkoutSession Component", () => {
     role: "user",
     membershipType: "trial",
     workoutHistory: [],
+    password: "password123", // Added password
   }
 
   const mockWorkout: DayWorkout = {
@@ -47,7 +48,7 @@ describe("WorkoutSession Component", () => {
     const markCompleteButtons = screen.getAllByRole("button", { name: /mark complete/i })
     expect(markCompleteButtons.length).toBe(1) // Only one is active at a time
     fireEvent.click(markCompleteButtons[0])
-
+    
     // After 1st exercise, the button for 2nd exercise should appear
     const markCompleteButtonsAfterFirst = screen.getAllByRole("button", { name: /mark complete/i })
     expect(markCompleteButtonsAfterFirst.length).toBe(1)
@@ -64,7 +65,7 @@ describe("WorkoutSession Component", () => {
     act(() => {
       jest.advanceTimersByTime(5 * 60 * 1000); // Advance by 5 minutes (300 seconds)
     });
-
+    
     fireEvent.click(finishWorkoutButton)
     jest.useRealTimers()
 
@@ -82,7 +83,7 @@ describe("WorkoutSession Component", () => {
       })),
       // caloriesBurned will be calculated by the component, so we check if it exists
     }
-
+    
     const actualRecord = mockOnComplete.mock.calls[0][0] as WorkoutRecord;
     expect(actualRecord.date).toEqual(expectedRecord.date)
     expect(actualRecord.duration).toEqual(expectedRecord.duration)
@@ -97,7 +98,7 @@ describe("WorkoutSession Component", () => {
 
   test("calls onComplete with partial data when header back button is clicked", () => {
     render(<WorkoutSession workout={mockWorkout} userProfile={mockUserProfile} onComplete={mockOnComplete} />)
-
+    
     jest.useFakeTimers()
     act(() => {
       jest.advanceTimersByTime(2 * 60 * 1000); // Advance by 2 minutes (120 seconds)
@@ -120,6 +121,6 @@ describe("WorkoutSession Component", () => {
         weight: ex.weight,
       })))
     // Calories burned will be 0 if no exercises were marked complete
-    expect(actualRecord.caloriesBurned).toBe(0)
+    expect(actualRecord.caloriesBurned).toBe(0) 
   })
 })

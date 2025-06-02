@@ -75,7 +75,7 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
 
   const finishWorkout = (isFullyCompleted: boolean = true) => {
     setIsActive(false)
-
+    
     const finalExercisesPerformed = workout.exercises.map(ex => ({
       id: ex.id,
       name: ex.name,
@@ -125,7 +125,7 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
       <div className="bg-white shadow-sm border-b p-4">
         <div className="flex items-center justify-between">
           {/* Updated: Header back button calls finishWorkout with isFullyCompleted = false */}
-          <Button variant="ghost" size="sm" onClick={() => finishWorkout(false) }>
+          <Button variant="ghost" size="sm" onClick={() => finishWorkout(false) }> 
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-bold">{workout.day} Workout</h1>
