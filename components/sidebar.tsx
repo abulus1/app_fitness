@@ -14,6 +14,9 @@ import {
   ShieldCheck,
   LogOut,
   UserCircle, // Fallback for Avatar
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 
 export type SidebarNavigationScreen = 
@@ -30,6 +33,8 @@ interface SidebarProps {
   onNavigate: (screen: SidebarNavigationScreen) => void;
   onLogout: () => void;
   userProfile: UserProfile | null;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 const navItems = [
@@ -56,7 +61,10 @@ export function Sidebar({ currentScreen, onNavigate, onLogout, userProfile }: Si
   };
 
   return (
-    <div className="fixed top-0 left-0 h-full w-64 bg-gray-800 text-white flex flex-col p-4 shadow-lg">
+    <div className={`fixed top-0 left-0 h-full w-64 bg-gray-800 text-white flex flex-col p-4 shadow-lg transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <button onClick={onToggle} className="absolute top-5 right-4 p-1 text-gray-300 hover:text-white md:hidden" aria-label="Close sidebar">
+        <X size={24} />
+      </button>
       {/* User Info Section */}
       <div className="mb-8 mt-4 flex flex-col items-center text-center">
         <Avatar className="h-20 w-20 mb-3">
@@ -106,8 +114,17 @@ export function Sidebar({ currentScreen, onNavigate, onLogout, userProfile }: Si
         ))}
       </nav>
 
-      {/* Logout Button */}
+      {/* Logout Button & Desktop Toggle Button */}
       <div className="mt-auto">
+        <Button
+          variant="ghost"
+          className="hidden md:flex w-full justify-start items-center text-left h-10 mb-2 text-gray-300 hover:bg-gray-700/80 hover:text-white"
+          onClick={onToggle}
+          aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {isOpen ? <ChevronLeft className="mr-3 h-5 w-5" /> : <ChevronRight className="mr-3 h-5 w-5" />}
+          {isOpen ? "Collapse" : "Expand"}
+        </Button>
         <Button
           variant="outline"
           className="w-full justify-start text-left h-10 bg-transparent border-gray-600 hover:bg-red-700/80 hover:border-red-700 hover:text-white text-gray-300"
