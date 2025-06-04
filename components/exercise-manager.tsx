@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -110,20 +110,70 @@ const getYoutubeEmbedUrl = (url: string | undefined): string | null => {
   return null; // Not a recognized YouTube URL pattern
 };
 
+interface ExerciseVideoPlayerProps {
+  youtubeUrl: string | undefined;
+  exerciseName: string | undefined;
+}
+
+const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({ youtubeUrl, exerciseName }) => {
+  const [videoError, setVideoError] = useState(false);
+  const embedUrl = getYoutubeEmbedUrl(youtubeUrl);
+
+  // Reset error state if youtubeUrl changes
+  useEffect(() => {
+    setVideoError(false);
+  }, [youtubeUrl]);
+
+  if (videoError || !embedUrl) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', borderRadius: '0.5rem' }}>
+        {/* Using a generic video icon from lucide-react if placeholder.svg is not guaranteed */}
+        {/* <Video className="w-12 h-12 text-gray-400 mb-2" /> */}
+        <img src="/placeholder.svg" alt="Video unavailable" style={{ width: '50px', height: '50px', marginBottom: '10px' }} />
+        <p style={{ color: '#555', textAlign: 'center', padding: '0 10px' }}>Video currently unavailable.</p>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      width="100%"
+      height="100%"
+      src={embedUrl}
+      title={exerciseName || "Exercise Video"}
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowFullScreen
+      className="w-full h-full"
+      onError={() => setVideoError(true)}
+    />
+  );
+};
+
 export function ExerciseManager({ workout, userProfile, onSave, onCancel }: ExerciseManagerProps) {
   const [exercises, setExercises] = useState<Exercise[]>(() =>
-    workout.exercises.map(ex => ({
-      ...ex,
-      calories: calculateCaloriesBurned(ex, userProfile, ex.reps, ex.weight)
-    }))
+    workout.exercises.map(ex => {
+      const durationMinutes = getExerciseDurationMinutes(ex.reps); // Helper for duration
+      return {
+        ...ex,
+        calories: calculateCaloriesBurned(ex, userProfile.weight, durationMinutes)
+      };
+    })
   );
+
+  // Helper to estimate duration for an exercise based on reps (e.g., 3 seconds per rep)
+  const getExerciseDurationMinutes = (reps: number): number => {
+    if (reps <= 0) return 0; // No reps, no duration for calorie calculation
+    return (reps * 3) / 60; // Duration in minutes (e.g., 10 reps * 3s/rep = 30s = 0.5 min)
+  };
 
   const addExercise = (exerciseData: ExerciseDataItem) => {
     if (exerciseData) {
       const defaultReps = 10;
       const defaultWeight = 0;
+      const durationMinutes = getExerciseDurationMinutes(defaultReps);
       const initialCalories = userProfile
-        ? calculateCaloriesBurned(exerciseData, userProfile, defaultReps, defaultWeight)
+        ? calculateCaloriesBurned(exerciseData, userProfile.weight, durationMinutes)
         : 0;
 
       const newExercise: Exercise = {
@@ -146,12 +196,12 @@ export function ExerciseManager({ workout, userProfile, onSave, onCancel }: Exer
         if (ex.id === id) {
           const updatedExercise = { ...ex, [field]: value };
           // Recalculate calories if reps or weight changed
-          if ((field === "reps" || field === "weight") && userProfile) {
+          if ((field === "reps" || field === "weight") && userProfile) { // Weight change might not affect calories if duration is purely reps-based
+            const durationMinutes = getExerciseDurationMinutes(updatedExercise.reps);
             updatedExercise.calories = calculateCaloriesBurned(
-              updatedExercise, // Pass the exercise itself (which has mets)
-              userProfile,
-              updatedExercise.reps,
-              updatedExercise.weight
+              updatedExercise,
+              userProfile.weight,
+              durationMinutes
             );
           }
           return updatedExercise;
@@ -227,25 +277,7 @@ export function ExerciseManager({ workout, userProfile, onSave, onCancel }: Exer
               <div className="space-y-4">
                 {/* YouTube Video Embed */}
                 <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                  {(() => {
-                    const embedUrl = getYoutubeEmbedUrl(exercise.youtubeUrl);
-                    if (embedUrl) {
-                      return (
-                        <iframe
-                          width="100%"
-                          height="100%" // className="w-full h-full" could also be used if aspect-video is on parent
-                          src={embedUrl}
-                          title={exercise.name || "Exercise Video"}
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                          allowFullScreen
-                          className="w-full h-full" // Ensure iframe takes full space of parent
-                        ></iframe>
-                      );
-                    } else {
-                      return <span className="text-gray-500 p-2">No video available or invalid URL</span>;
-                    }
-                  })()}
+                  <ExerciseVideoPlayer youtubeUrl={exercise.youtubeUrl} exerciseName={exercise.name} />
                 </div>
 
                 {/* Exercise Parameters */}

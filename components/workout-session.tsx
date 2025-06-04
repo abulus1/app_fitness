@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import type { DayWorkout, Exercise, UserProfile } from "@/app/page"
 import { ArrowLeft, CheckCircle, Timer, Flame } from "lucide-react"
 import { calculateCaloriesBurned } from "@/lib/utils" // Import the new calorie calculation utility
+// VideoPlaceholderIcon can be replaced with an actual icon like Video from lucide-react if desired
+// For now, using the img tag with placeholder.svg as in ExerciseManager
 
 import { WorkoutRecord } from "@/app/page"; 
 
@@ -43,6 +45,66 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
     return (reps * 3) / 60; // Duration in minutes
   };
 
+// Helper function to convert YouTube watch URL to embed URL (copied from ExerciseManager)
+const getYoutubeEmbedUrl = (url: string | undefined): string | null => {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname === "www.youtube.com" || urlObj.hostname === "youtube.com") {
+      if (urlObj.pathname === "/watch") {
+        const videoId = urlObj.searchParams.get("v");
+        return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+      } else if (urlObj.pathname.startsWith("/embed/")) {
+        return url; // Already an embed URL
+      }
+    } else if (urlObj.hostname === "youtu.be") { // Handle shortened URLs
+      const videoId = urlObj.pathname.substring(1);
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+  } catch (error) {
+    // console.error("Invalid YouTube URL:", error);
+    return null;
+  }
+  return null;
+};
+
+interface ExerciseVideoPlayerProps {
+  youtubeUrl: string | undefined;
+  exerciseName: string | undefined;
+}
+
+const ExerciseVideoPlayer: React.FC<ExerciseVideoPlayerProps> = ({ youtubeUrl, exerciseName }) => {
+  const [videoError, setVideoError] = useState(false);
+  const embedUrl = getYoutubeEmbedUrl(youtubeUrl);
+
+  useEffect(() => {
+    setVideoError(false);
+  }, [youtubeUrl]);
+
+  if (videoError || !embedUrl) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', borderRadius: '0.5rem' }}>
+        <img src="/placeholder.svg" alt="Video unavailable" style={{ width: '50px', height: '50px', marginBottom: '10px' }} />
+        <p style={{ color: '#555', textAlign: 'center', padding: '0 10px' }}>Video currently unavailable.</p>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      width="100%"
+      height="100%"
+      src={embedUrl}
+      title={exerciseName || "Exercise Video"}
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowFullScreen
+      className="w-full h-full"
+      onError={() => setVideoError(true)}
+    />
+  );
+};
+
   const completeExercise = () => {
     if (!completedExercises.includes(currentExercise.id)) {
       setCompletedExercises([...completedExercises, currentExercise.id])
@@ -60,25 +122,45 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
   const finishWorkout = (isFullyCompleted: boolean = true) => {
     setIsActive(false)
     
-    const finalExercisesPerformed = workout.exercises.map(ex => ({
-      id: ex.id,
-      name: ex.name,
-      category: ex.category,
-      reps: ex.reps, // Assuming these are target reps, or actual if tracked
-      weight: ex.weight, // Assuming this is target weight, or actual if tracked
-    }));
-
-    // Use the existing totalCalories calculation which sums up calories for completed exercises
-    // If !isFullyCompleted, this will reflect partial completion.
-    // If isFullyCompleted, it's implied all exercises contributed if they were marked.
     let totalCaloriesBurnedForSession = 0;
-    workout.exercises.forEach(exercise => {
-      if (completedExercises.includes(exercise.id) || isFullyCompleted) { // If fully completed, count all exercises
-        const exerciseDurationMinutes = getExerciseDurationMinutes(exercise.reps);
-        totalCaloriesBurnedForSession += calculateCaloriesBurned(exercise, userProfile.weight, exerciseDurationMinutes);
-      }
-    });
+    const finalExercisesPerformed = workout.exercises
+      .filter(ex => isFullyCompleted || completedExercises.includes(ex.id)) // Process only relevant exercises
+      .map(ex => {
+        const durationMinutes = getExerciseDurationMinutes(ex.reps);
+        const calories = calculateCaloriesBurned(ex, userProfile.weight, durationMinutes);
+        totalCaloriesBurnedForSession += calories;
+        return {
+          id: ex.id,
+          name: ex.name,
+          category: ex.category,
+          reps: ex.reps,
+          weight: ex.weight,
+          durationMinutes: durationMinutes,
+          caloriesBurned: calories,
+          metsValue: ex.metsValue,
+        };
+      });
+
+    // If not fully completed, recalculate total calories based on *actually processed* exercises in finalExercisesPerformed
+    // This might be redundant if the filter + map logic for totalCaloriesBurnedForSession is already correct.
+    // Let's ensure totalCaloriesBurnedForSession is purely from the exercises included in finalExercisesPerformed.
+    // The current map().reduce() on totalCaloriesBurnedForSession within the map itself is correct.
     
+    // If workout is exited early, totalCaloriesBurnedForSession should reflect only completed exercises.
+    // The logic for totalCaloriesBurnedForSession needs to be accurate for both full and partial completion.
+    // The current `totalCaloriesBurnedForSession += calories` inside the map handles this correctly
+    // as `finalExercisesPerformed` is already filtered.
+
+    // The old logic for totalCaloriesBurnedForSession:
+    // let totalCaloriesBurnedForSession = 0;
+    // workout.exercises.forEach(exercise => {
+    //   if (completedExercises.includes(exercise.id) || isFullyCompleted) {
+    //     const exerciseDurationMinutes = getExerciseDurationMinutes(exercise.reps);
+    //     totalCaloriesBurnedForSession += calculateCaloriesBurned(exercise, userProfile.weight, exerciseDurationMinutes);
+    //   }
+    // });
+    // This old logic is fine, but the new one sums it up while building finalExercisesPerformed.
+
     const record: WorkoutRecord = {
       date: new Date().toISOString(),
       duration: Math.floor(sessionTime / 60), 
@@ -156,9 +238,9 @@ export function WorkoutSession({ workout, userProfile, onComplete }: WorkoutSess
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Video Placeholder */}
-                <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-                  <span className="text-gray-500">Exercise Video</span>
+                {/* Video Player */}
+                <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                  <ExerciseVideoPlayer youtubeUrl={currentExercise.youtubeUrl} exerciseName={currentExercise.name} />
                 </div>
 
                 {/* Exercise Details */}
