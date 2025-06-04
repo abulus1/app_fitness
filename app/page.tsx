@@ -316,16 +316,35 @@ export default function FitnessApp() {
   // Render main app layout with Sidebar if user is logged in
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Hamburger Menu Button for Mobile */}
+      <button
+        onClick={() => setIsSidebarOpen(true)}
+        className={`fixed top-4 left-4 z-30 p-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors duration-200 md:hidden ${isSidebarOpen ? 'hidden' : 'block'}`}
+        aria-label="Open sidebar"
+      >
+        <Menu size={24} />
+      </button>
+
       <Sidebar
         currentScreen={currentScreen}
         onNavigate={handleSidebarNavigate}
         onLogout={handleLogout}
         userProfile={userProfile}
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
       />
-      <main className="flex-1 p-6 overflow-y-auto">
-        <button onClick={() => toast("This is a test toast!")} className="m-4 p-2 bg-blue-500 text-white rounded">
-          Show Test Toast
-        </button>
+<main className={`flex-1 p-6 overflow-y-auto transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:ml-64' : 'md:ml-0'}`}>
+  {/* Botón para mostrar alerta centrada */}
+  <button onClick={handleTestAlert} className="m-4 p-2 bg-blue-500 text-white rounded">
+    Test Centered Alert
+  </button>
+
+  {/* Botón para mostrar toast */}
+  <button onClick={() => toast("This is a test toast!")} className="m-4 p-2 bg-green-500 text-white rounded">
+    Show Test Toast
+  </button>
+</main>
+
         {currentScreen === "planner" && (
           <WeeklyPlanner
             userProfile={userProfile}

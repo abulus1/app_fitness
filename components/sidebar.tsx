@@ -50,7 +50,7 @@ const adminNavItems = [
   { name: "Admin Dashboard", screen: "adminDashboard" as SidebarNavigationScreen, icon: ShieldCheck }
 ];
 
-export function Sidebar({ currentScreen, onNavigate, onLogout, userProfile }: SidebarProps) {
+export function Sidebar({ currentScreen, onNavigate, onLogout, userProfile, isOpen, onToggle }: SidebarProps) {
   const getInitials = (name: string | undefined) => {
     if (!name) return "U";
     const names = name.split(' ');
