@@ -333,9 +333,18 @@ export default function FitnessApp() {
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
       />
-      <main className={`flex-1 p-6 overflow-y-auto transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:ml-64' : 'md:ml-0'}`}>
-        {/* Test button can be removed if not needed, or kept for testing */}
-        <button onClick={handleTestAlert} className="m-4 p-2 bg-blue-500 text-white rounded">Test Centered Alert</button>
+<main className={`flex-1 p-6 overflow-y-auto transition-all duration-300 ease-in-out ${isSidebarOpen ? 'md:ml-64' : 'md:ml-0'}`}>
+  {/* Botón para mostrar alerta centrada */}
+  <button onClick={handleTestAlert} className="m-4 p-2 bg-blue-500 text-white rounded">
+    Test Centered Alert
+  </button>
+
+  {/* Botón para mostrar toast */}
+  <button onClick={() => toast("This is a test toast!")} className="m-4 p-2 bg-green-500 text-white rounded">
+    Show Test Toast
+  </button>
+</main>
+
         {currentScreen === "planner" && (
           <WeeklyPlanner
             userProfile={userProfile}
