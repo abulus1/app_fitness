@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react"
 // Remove SignUpScreen, Add LoginScreen and RegistrationScreen
-import { LoginScreen, LoginCredentials } from "@/components/login-screen" 
+import { LoginScreen, LoginCredentials } from "@/components/login-screen"
 import { RegistrationScreen, RegistrationData } from "@/components/registration-screen"
 import { WeeklyPlanner } from "@/components/weekly-planner"
+import { toast } from "sonner"
 import { WorkoutSession } from "@/components/workout-session"
 import { ProfileScreen } from "@/components/profile-screen"
 import { AdminDashboard } from "@/components/admin-dashboard"
 import { Sidebar, SidebarNavigationScreen } from "@/components/sidebar"
+import { Menu } from "lucide-react"
 import { BookingScreen } from "@/components/booking-screen" // Import new screens
 import { TrainingHistoryScreen } from "@/components/training-history-screen"
 import { CreateRoutineScreen } from "@/components/create-routine-screen"
@@ -29,17 +31,22 @@ export type UserProfile = {
   password?: string // Added password, make it optional for now for easier adoption
 }
 
+export type PerformedExercise = {
+  id: string;
+  name: string;
+  category: string;
+  reps: number;
+  weight: number;
+  durationMinutes: number; // Duration of this specific exercise instance
+  caloriesBurned: number;  // Calories burned for this specific exercise instance
+  metsValue?: number; // Optional: store METS value used for calculation for traceability
+};
+
 export type WorkoutRecord = {
   date: string // ISO string for date
-  duration: number // in minutes
-  exercisesPerformed: Array<{
-    id: string // Keep id from Exercise type
-    name: string
-    category: string
-    reps: number
-    weight: number
-  }>
-  caloriesBurned?: number // Optional
+  duration: number // in minutes (total session duration)
+  exercisesPerformed: PerformedExercise[];
+  caloriesBurned?: number // Optional: Total calories for the session
 }
 
 export type Exercise = {
@@ -70,9 +77,23 @@ type AppScreen = SidebarNavigationScreen | "login" | "registration" | "workout";
 
 export default function FitnessApp() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>("login");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [allUserProfiles, setAllUserProfiles] = useState<UserProfile[]>([]);
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) { // md breakpoint
+        setIsSidebarOpen(true); // Open by default on larger screens
+      } else {
+        setIsSidebarOpen(false); // Closed by default on smaller screens
+      }
+    };
+    handleResize(); // Set initial state
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlan[]>([]);
   const [currentWorkout, setCurrentWorkout] = useState<DayWorkout | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -275,6 +296,14 @@ export default function FitnessApp() {
   // Determine which profile to display on ProfileScreen
   const profileToDisplayOnScreen = viewingProfile || userProfile;
 
+  // --- Test Alert Handler ---
+  const handleTestAlert = () => {
+    toast.message("Test Alert", {
+      description: "This is a test alert displayed in the center.",
+      duration: 5000, // milliseconds
+    });
+  };
+
   // Render authentication screens if no user profile
   if (!userProfile) {
     if (currentScreen === "registration") {
@@ -294,6 +323,9 @@ export default function FitnessApp() {
         userProfile={userProfile}
       />
       <main className="flex-1 p-6 overflow-y-auto">
+        <button onClick={() => toast("This is a test toast!")} className="m-4 p-2 bg-blue-500 text-white rounded">
+          Show Test Toast
+        </button>
         {currentScreen === "planner" && (
           <WeeklyPlanner
             userProfile={userProfile}
