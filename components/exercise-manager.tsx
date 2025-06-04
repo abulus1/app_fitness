@@ -159,7 +159,7 @@ export function ExerciseManager({ workout, userProfile, onSave, onCancel }: Exer
         calories: calculateCaloriesBurned(ex, userProfile.weight, durationMinutes)
       };
     })
-  ));
+  );
 
   // Helper to estimate duration for an exercise based on reps (e.g., 3 seconds per rep)
   const getExerciseDurationMinutes = (reps: number): number => {
